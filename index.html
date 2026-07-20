@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Winterball – Speisekarte</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root { font-family: 'Inter', sans-serif; }
+        body { background-color: #0f172a; color: #e2e8f0; }
+
+        .bg-noise {
+            background-image: radial-gradient(circle at 20% 10%, rgba(99,102,241,0.18), transparent 40%),
+                               radial-gradient(circle at 90% 30%, rgba(56,189,248,0.12), transparent 45%),
+                               radial-gradient(circle at 50% 90%, rgba(99,102,241,0.10), transparent 50%);
+        }
+
+        .item-card {
+            background: linear-gradient(145deg, rgba(30,41,59,0.7), rgba(17,24,39,0.7));
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148,163,184,0.12);
+            border-radius: 1.75rem;
+            transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), border-color 0.2s ease;
+        }
+        .item-card:active { transform: scale(0.97); }
+        .item-card.sold-out { opacity: 0.45; filter: grayscale(0.6); }
+
+        .tab-btn {
+            transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), color 0.2s ease;
+            border-radius: 0.9rem;
+        }
+        .tab-btn:active { transform: scale(0.95); }
+
+        nav, header .flex.gap-1\.5 { border-radius: 1.25rem; }
+
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16,1,0.3,1) both; }
+        @keyframes fadeIn { from { opacity:0; transform: translateY(10px) scale(0.97);} to {opacity:1; transform:translateY(0) scale(1);} }
+
+        #menuGrid.switching { animation: gridOut 0.15s ease both; }
+        @keyframes gridOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.98); } }
+
+        .pill-indicator {
+            position: absolute;
+            top: 4px; bottom: 4px;
+            border-radius: 0.9rem;
+            background: #4f46e5;
+            box-shadow: 0 4px 14px rgba(79,70,229,0.4);
+            transition: left 0.32s cubic-bezier(0.65,0,0.35,1), width 0.32s cubic-bezier(0.65,0,0.35,1);
+            z-index: 0;
+        }
+        .tab-btn-content { position: relative; z-index: 1; }
+
+        .custom-scrollbar::-webkit-scrollbar { height: 4px; width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 99px; }
+
+        @keyframes badgePop {
+            0% { transform: scale(0); }
+            60% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+        .badge-pop { animation: badgePop 0.35s cubic-bezier(0.34,1.56,0.64,1) both; }
+    </style>
+</head>
+<body class="min-h-screen bg-noise">
+
+    <!-- LOADING -->
+    <div id="loadingOverlay" class="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center gap-4">
+        <div class="w-10 h-10 border-4 border-slate-700 border-t-indigo-500 rounded-full animate-spin"></div>
+        <p class="text-slate-500 text-sm font-medium">Speisekarte wird geladen...</p>
+    </div>
+
+    <!-- HEADER -->
+    <header class="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-lg border-b border-slate-800/80">
+        <div class="max-w-3xl mx-auto px-5 pt-6 pb-4">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-500/20">
+                    <i data-lucide="snowflake" class="text-white w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black text-white tracking-tight leading-none">Winterball</h1>
+                    <p class="text-[11px] text-indigo-400 font-medium tracking-widest uppercase mt-0.5">Speisekarte</p>
+                </div>
+            </div>
+
+            <div id="tabWrap" class="relative flex gap-1.5 bg-slate-800/50 p-1 rounded-2xl border border-slate-700/50 overflow-hidden">
+                <div id="tabPill" class="pill-indicator"></div>
+                <button onclick="setCategory(1)" id="cat-btn-1" class="tab-btn flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-bold text-white">
+                    <span class="tab-btn-content flex items-center gap-1.5"><i data-lucide="cup-soda" class="w-4 h-4"></i> Getränke</span>
+                </button>
+                <button onclick="setCategory(2)" id="cat-btn-2" class="tab-btn flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-bold text-slate-400">
+                    <span class="tab-btn-content flex items-center gap-1.5"><i data-lucide="utensils" class="w-4 h-4"></i> Speisen</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENT -->
+    <main class="max-w-3xl mx-auto px-5 py-6 pb-16">
+        <div id="emptyState" class="hidden text-center text-slate-600 py-20">
+            <i data-lucide="clipboard-x" class="w-10 h-10 mx-auto mb-3 opacity-50"></i>
+            <p class="text-sm font-medium">Gerade keine Artikel verfügbar.</p>
+        </div>
+        <div id="menuGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+
+        <p class="text-center text-slate-600 text-xs mt-10 flex items-center justify-center gap-1.5">
+            <i data-lucide="refresh-cw" class="w-3 h-3"></i> Aktualisiert sich automatisch
+        </p>
+    </main>
+
+    <!-- FIREBASE (nur lesend) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDIHKr_s9517gqqY8_LhxXehxWO49RgjYM",
+            authDomain: "winterball-47c80.firebaseapp.com",
+            projectId: "winterball-47c80",
+            storageBucket: "winterball-47c80.firebasestorage.app",
+            messagingSenderId: "163769695678",
+            appId: "1:163769695678:web:e6efe50cbda33fa7edcdef"
+        };
+
+        const appId = 'winter-kasse-pro';
+        const PATH = `/artifacts/${appId}/public/data`;
+
+        let inventory = {};
+        let currentCategory = 1; // 1 = Getränke, 2 = Speisen
+
+        function positionPill() {
+            const wrap = document.getElementById('tabWrap');
+            const pill = document.getElementById('tabPill');
+            const activeBtn = document.getElementById(`cat-btn-${currentCategory}`);
+            if (!wrap || !pill || !activeBtn) return;
+            const wrapRect = wrap.getBoundingClientRect();
+            const btnRect = activeBtn.getBoundingClientRect();
+            pill.style.left = (btnRect.left - wrapRect.left) + 'px';
+            pill.style.width = btnRect.width + 'px';
+        }
+
+        window.setCategory = (pos) => {
+            if (pos === currentCategory) return;
+            currentCategory = pos;
+            document.getElementById('cat-btn-1').className = `tab-btn flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-bold ${pos === 1 ? 'text-white' : 'text-slate-400'}`;
+            document.getElementById('cat-btn-2').className = `tab-btn flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-bold ${pos === 2 ? 'text-white' : 'text-slate-400'}`;
+            positionPill();
+
+            const grid = document.getElementById('menuGrid');
+            grid.classList.add('switching');
+            setTimeout(() => {
+                grid.classList.remove('switching');
+                renderMenu();
+            }, 140);
+        };
+
+        window.addEventListener('resize', positionPill);
+
+        function fmt(n) {
+            return (n || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+        }
+
+        function renderMenu() {
+            const grid = document.getElementById('menuGrid');
+            const empty = document.getElementById('emptyState');
+            grid.innerHTML = '';
+
+            const names = Object.keys(inventory)
+                .filter(n => (inventory[n].assignedPos || 0) === currentCategory || (inventory[n].assignedPos || 0) === 0)
+                .sort((a, b) => a.localeCompare(b, 'de'));
+
+            if (names.length === 0) {
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+
+            names.forEach((name, i) => {
+                const item = inventory[name];
+                const soldOut = item.hasVariants
+                    ? (item.stockS <= 0 && item.stockL <= 0)
+                    : (item.stock <= 0);
+
+                const priceHtml = item.hasVariants
+                    ? `<div class="flex gap-4 mt-1.5">
+                         <div class="text-sm ${item.stockS <= 0 ? 'text-slate-600 line-through' : 'text-slate-300'}"><span class="text-slate-500 text-xs mr-1">Klein</span><span class="font-bold">${fmt(item.priceS)}</span></div>
+                         <div class="text-sm ${item.stockL <= 0 ? 'text-slate-600 line-through' : 'text-slate-300'}"><span class="text-slate-500 text-xs mr-1">Groß</span><span class="font-bold">${fmt(item.priceL)}</span></div>
+                       </div>`
+                    : `<div class="text-lg font-black text-white mt-1.5">${fmt(item.price)}</div>`;
+
+                const card = document.createElement('div');
+                card.className = `item-card fade-in p-4 flex items-center justify-between gap-3 ${soldOut ? 'sold-out' : ''}`;
+                card.style.animationDelay = `${Math.min(i, 10) * 30}ms`;
+                card.innerHTML = `
+                    <div class="min-w-0">
+                        <div class="text-white font-bold text-[15px] truncate">${name}</div>
+                        ${priceHtml}
+                    </div>
+                    ${soldOut ? '<span class="badge-pop flex-none text-[10px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-full uppercase tracking-wide">Ausverkauft</span>' : ''}
+                `;
+                grid.appendChild(card);
+            });
+
+            lucide.createIcons();
+        }
+
+        async function init() {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+
+            try {
+                await signInAnonymously(auth);
+            } catch (e) {
+                console.error("Auth Fehler:", e);
+            }
+
+            onAuthStateChanged(auth, u => {
+                if (!u) return;
+                onSnapshot(collection(db, PATH, 'inventory'), snap => {
+                    inventory = {};
+                    snap.forEach(d => inventory[d.id] = d.data());
+                    renderMenu();
+                    const overlay = document.getElementById('loadingOverlay');
+                    if (overlay) { overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 300); }
+                }, err => console.error("Firestore Fehler:", err));
+            });
+        }
+
+        lucide.createIcons();
+        positionPill();
+        init();
+    </script>
+</body>
+</html>
